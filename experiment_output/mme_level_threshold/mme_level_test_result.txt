@@ -1,0 +1,245 @@
+Device:      1 — 麦克风阵列 (Realtek(R) Audio)
+Host API:    MME
+Sample rate: 44100 Hz
+Channels:    1
+
+Keep the same distance and body position for every trial.
+Sustain only “啊” from SPEAK NOW until DONE.
+
+============================================================================
+Level:       quiet
+Run:         1/3
+Instruction: Speak softly, but keep the sustained “啊” clearly voiced.
+Output:      experiment_output\mme_level_threshold\mme_quiet_run_1_44100.wav
+Press Enter when ready...
+Microphone is active. Remain silent...
+
+SPEAK NOW — sustain “啊” until DONE appears.
+
+DONE
+Noise floor:                -44.4 dBFS
+Speech RMS after onset:     -37.9 dBFS
+Peak:                       -23.0 dBFS
+Onset delay after cue:       2.05 s
+Initial 250 ms level:      -33.52 dBFS
+Later steady level:        -39.46 dBFS
+Gain change:                -5.94 dB
+Longest continuous run:     0.15 s
+Dropout before end:          2.80 s
+Continuity:                  5.1%
+Zero samples after cue:      0.12%
+Input overflow:           False
+WARNING: The vowel was not continuously preserved.
+
+============================================================================
+Level:       quiet
+Run:         2/3
+Instruction: Speak softly, but keep the sustained “啊” clearly voiced.
+Output:      experiment_output\mme_level_threshold\mme_quiet_run_2_44100.wav
+Press Enter when ready...
+Microphone is active. Remain silent...
+
+SPEAK NOW — sustain “啊” until DONE appears.
+
+DONE
+Noise floor:                -44.3 dBFS
+Speech RMS after onset:     -33.5 dBFS
+Peak:                       -20.9 dBFS
+Onset delay after cue:       0.90 s
+Initial 250 ms level:      -31.13 dBFS
+Later steady level:        -32.25 dBFS
+Gain change:                -1.13 dB
+Longest continuous run:     2.65 s
+Dropout before end:          1.45 s
+Continuity:                 64.6%
+Zero samples after cue:      0.07%
+Input overflow:           False
+WARNING: The vowel was not continuously preserved.
+
+============================================================================
+Level:       quiet
+Run:         3/3
+Instruction: Speak softly, but keep the sustained “啊” clearly voiced.
+Output:      experiment_output\mme_level_threshold\mme_quiet_run_3_44100.wav
+Press Enter when ready...
+Microphone is active. Remain silent...
+
+SPEAK NOW — sustain “啊” until DONE appears.
+
+DONE
+Noise floor:                -44.3 dBFS
+Speech RMS after onset:     -36.6 dBFS
+Peak:                       -23.6 dBFS
+Onset delay after cue:       1.60 s
+Initial 250 ms level:      -34.12 dBFS
+Later steady level:        -35.88 dBFS
+Gain change:                -1.76 dB
+Longest continuous run:     0.35 s
+Dropout before end:          3.05 s
+Continuity:                 10.3%
+Zero samples after cue:      0.12%
+Input overflow:           False
+WARNING: The vowel was not continuously preserved.
+
+============================================================================
+Level:       normal
+Run:         1/3
+Instruction: Use your normal conversational volume.
+Output:      experiment_output\mme_level_threshold\mme_normal_run_1_44100.wav
+Press Enter when ready...
+Microphone is active. Remain silent...
+
+SPEAK NOW — sustain “啊” until DONE appears.
+
+DONE
+Noise floor:                -42.7 dBFS
+Speech RMS after onset:     -31.3 dBFS
+Peak:                       -19.9 dBFS
+Onset delay after cue:       0.70 s
+Initial 250 ms level:      -29.68 dBFS
+Later steady level:        -30.22 dBFS
+Gain change:                -0.54 dB
+Longest continuous run:     1.80 s
+Dropout before end:          0.15 s
+Continuity:                 41.9%
+Zero samples after cue:      0.07%
+Input overflow:           False
+WARNING: The vowel was not continuously preserved.
+
+============================================================================
+Level:       normal
+Run:         2/3
+Instruction: Use your normal conversational volume.
+Output:      experiment_output\mme_level_threshold\mme_normal_run_2_44100.wav
+Press Enter when ready...
+Microphone is active. Remain silent...
+
+SPEAK NOW — sustain “啊” until DONE appears.
+
+DONE
+Noise floor:                -44.3 dBFS
+Speech RMS after onset:     -31.6 dBFS
+Peak:                       -20.5 dBFS
+Onset delay after cue:       0.85 s
+Initial 250 ms level:      -32.32 dBFS
+Later steady level:        -31.27 dBFS
+Gain change:                 1.05 dB
+Longest continuous run:     4.15 s
+Dropout before end:          0.00 s
+Continuity:                100.0%
+Zero samples after cue:      0.07%
+Input overflow:           False
+
+============================================================================
+Level:       normal
+Run:         3/3
+Instruction: Use your normal conversational volume.
+Output:      experiment_output\mme_level_threshold\mme_normal_run_3_44100.wav
+Press Enter when ready...
+Microphone is active. Remain silent...
+
+SPEAK NOW — sustain “啊” until DONE appears.
+
+DONE
+Noise floor:                -43.9 dBFS
+Speech RMS after onset:     -31.0 dBFS
+Peak:                       -20.9 dBFS
+Onset delay after cue:       0.00 s
+Initial 250 ms level:      -34.70 dBFS
+Later steady level:        -29.31 dBFS
+Gain change:                 5.38 dB
+Longest continuous run:     4.45 s
+Dropout before end:          0.00 s
+Continuity:                 89.0%
+Zero samples after cue:      0.04%
+Input overflow:           False
+WARNING: The vowel was not continuously preserved.
+
+============================================================================
+Level:       loud
+Run:         1/3
+Instruction: Speak loudly without shouting or moving closer to the microphone.
+Output:      experiment_output\mme_level_threshold\mme_loud_run_1_44100.wav
+Press Enter when ready...
+Microphone is active. Remain silent...
+
+SPEAK NOW — sustain “啊” until DONE appears.
+
+DONE
+Noise floor:                -44.4 dBFS
+Speech RMS after onset:     -25.5 dBFS
+Peak:                       -13.1 dBFS
+Onset delay after cue:       0.55 s
+Initial 250 ms level:      -23.51 dBFS
+Later steady level:        -24.16 dBFS
+Gain change:                -0.65 dB
+Longest continuous run:     4.45 s
+Dropout before end:          0.00 s
+Continuity:                100.0%
+Zero samples after cue:      0.05%
+Input overflow:           False
+
+============================================================================
+Level:       loud
+Run:         2/3
+Instruction: Speak loudly without shouting or moving closer to the microphone.
+Output:      experiment_output\mme_level_threshold\mme_loud_run_2_44100.wav
+Press Enter when ready...
+Microphone is active. Remain silent...
+
+SPEAK NOW — sustain “啊” until DONE appears.
+
+DONE
+Noise floor:                -44.9 dBFS
+Speech RMS after onset:     -25.1 dBFS
+Peak:                       -13.4 dBFS
+Onset delay after cue:       0.80 s
+Initial 250 ms level:      -25.39 dBFS
+Later steady level:        -24.44 dBFS
+Gain change:                 0.95 dB
+Longest continuous run:     4.20 s
+Dropout before end:          0.00 s
+Continuity:                100.0%
+Zero samples after cue:      0.05%
+Input overflow:           False
+
+============================================================================
+Level:       loud
+Run:         3/3
+Instruction: Speak loudly without shouting or moving closer to the microphone.
+Output:      experiment_output\mme_level_threshold\mme_loud_run_3_44100.wav
+Press Enter when ready...
+Microphone is active. Remain silent...
+
+SPEAK NOW — sustain “啊” until DONE appears.
+
+DONE
+Noise floor:                -44.8 dBFS
+Speech RMS after onset:     -26.2 dBFS
+Peak:                       -14.6 dBFS
+Onset delay after cue:       0.70 s
+Initial 250 ms level:      -24.57 dBFS
+Later steady level:        -25.06 dBFS
+Gain change:                -0.49 dB
+Longest continuous run:     4.30 s
+Dropout before end:          0.00 s
+Continuity:                100.0%
+Zero samples after cue:      0.04%
+Input overflow:           False
+
+==============================================================================================================
+SUMMARY
+Level    Run      RMS     Peak    Onset     Gain   Longest   Dropout  Continuity    Zeros
+--------------------------------------------------------------------------------------------------------------
+quiet      1   -37.9   -23.0     2.05     -5.9      0.15      2.80       5.1%    0.12%
+quiet      2   -33.5   -20.9     0.90     -1.1      2.65      1.45      64.6%    0.07%
+quiet      3   -36.6   -23.6     1.60     -1.8      0.35      3.05      10.3%    0.12%
+normal     1   -31.3   -19.9     0.70     -0.5      1.80      0.15      41.9%    0.07%
+normal     2   -31.6   -20.5     0.85     +1.0      4.15      0.00     100.0%    0.07%
+normal     3   -31.0   -20.9     0.00     +5.4      4.45      0.00      89.0%    0.04%
+loud       1   -25.5   -13.1     0.55     -0.6      4.45      0.00     100.0%    0.05%
+loud       2   -25.1   -13.4     0.80     +0.9      4.20      0.00     100.0%    0.05%
+loud       3   -26.2   -14.6     0.70     -0.5      4.30      0.00     100.0%    0.04%
+
+A reliable level should end near the recording boundary, maintain
+at least 90% continuity, and avoid a large positive gain change.
