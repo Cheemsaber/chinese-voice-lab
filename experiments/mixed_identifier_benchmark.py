@@ -38,7 +38,7 @@ PRE_ROLL_SECONDS = 1.0
 SPEECH_SECONDS = 5.0
 
 # Beam 5 did not improve the fixed-WAV benchmark and was consistently slower.
-MODEL_SIZES = ("base", "small")
+MODEL_SIZES = ("small",)
 BEAM_SIZE = 1
 LANGUAGE = "zh"
 DEVICE = "cpu"
@@ -123,6 +123,7 @@ CHINESE_DIGIT_TRANSLATION = str.maketrans(
         "零": "0",
         "〇": "0",
         "一": "1",
+        "幺": "1",
         "二": "2",
         "两": "2",
         "兩": "2",
@@ -522,10 +523,6 @@ def benchmark_models():
                 inference_seconds=inference_seconds,
             )
             results.append(result)
-
-        # Avoid retaining both model sizes in memory at the same time.
-        del model
-        gc.collect()
 
     return results
 
