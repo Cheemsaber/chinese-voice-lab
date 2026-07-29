@@ -14,7 +14,6 @@ from argparse import ArgumentParser
 import csv
 from dataclasses import dataclass
 from datetime import datetime
-import gc
 from pathlib import Path
 import re
 from statistics import mean, median
@@ -66,54 +65,49 @@ class PhraseCase:
     expected_stream: str
 
 
-# The canonical stream contains only the information that would drive a
-# peer-checking decision. Chinese digit pronunciations are represented as
-# Arabic digits, and English letters/states remain uppercase ASCII.
+# Every device number follows the operational format DDDCC: three digits
+# followed by two English letters. The spoken prompt uses Chinese digit names,
+# while expected_stream stores the canonical form used for comparison.
 PHRASE_CASES = (
     PhraseCase(
-        name="device_abc123",
-        prompt="设备编号 A B C 一二三。",
-        expected_stream="ABC123",
+        name="device_007kc",
+        prompt="设备编号 零零七 K C。",
+        expected_stream="007KC",
     ),
     PhraseCase(
-        name="verification_xq789",
-        prompt="验证码 X Q 七八九。",
-        expected_stream="XQ789",
+        name="device_018vb",
+        prompt="设备编号 零一八 V B。",
+        expected_stream="018VB",
     ),
     PhraseCase(
-        name="room_b204",
-        prompt="房间 B 二零四。",
-        expected_stream="B204",
+        name="device_016kg",
+        prompt="设备编号 零一六 K G。",
+        expected_stream="016KG",
     ),
     PhraseCase(
-        name="serial_rt562",
-        prompt="序列号 R T 五六二。",
-        expected_stream="RT562",
+        name="device_016ks",
+        prompt="设备编号 零一六 K S。",
+        expected_stream="016KS",
     ),
     PhraseCase(
-        name="alternating_a1b2c3",
-        prompt="编号 A 一 B 二 C 三。",
-        expected_stream="A1B2C3",
+        name="device_015kg",
+        prompt="设备编号 零一五 K G。",
+        expected_stream="015KG",
     ),
     PhraseCase(
-        name="device_mn508",
-        prompt="设备 M N 五零八。",
-        expected_stream="MN508",
+        name="device_019kg",
+        prompt="设备编号 零一九 K G。",
+        expected_stream="019KG",
     ),
     PhraseCase(
-        name="confusable_bdpt147",
-        prompt="设备 B D P T 一四七。",
-        expected_stream="BDPT147",
+        name="device_001ku",
+        prompt="设备编号 零零一 K U。",
+        expected_stream="001KU",
     ),
     PhraseCase(
-        name="device_c1_off",
-        prompt="确认设备 C 一的状态为 OFF。",
-        expected_stream="C1OFF",
-    ),
-    PhraseCase(
-        name="device_a2_on",
-        prompt="确认设备 A 二的状态为 ON。",
-        expected_stream="A2ON",
+        name="device_401ku",
+        prompt="设备编号 四零一 K U。",
+        expected_stream="401KU",
     ),
 )
 
@@ -499,6 +493,7 @@ def benchmark_models():
             model_size,
             device=DEVICE,
             compute_type=COMPUTE_TYPE,
+            local_files_only=True,
         )
         load_seconds = perf_counter() - load_started
         print(f"Model loaded in {load_seconds:.2f} seconds")
