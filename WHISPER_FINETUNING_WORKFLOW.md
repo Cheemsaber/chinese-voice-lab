@@ -163,6 +163,8 @@ Prefer clips shorter than 10-15 seconds for this pilot. Whisper Small with quant
 
 Use a dedicated environment rather than the system Python. The training environment will require compatible versions of PyTorch with CUDA support, Transformers, Datasets, Accelerate, Evaluate, PEFT, audio-processing dependencies, and optionally bitsandbytes for quantized model loading.
 
+Follow [`WHISPER_TRAINING_ENVIRONMENT_SETUP.md`](WHISPER_TRAINING_ENVIRONMENT_SETUP.md) for the tested Windows CUDA 12.6 installation and verification commands.
+
 ## 7. Fine-tune Large-v3 on a temporary GPU
 
 For the production experiment, use a Linux machine with:
