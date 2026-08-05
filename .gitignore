@@ -3,3 +3,9 @@
 .venv-*/
 venv/
 env/
+
+# Cache
+__pycache__/
+training_output/
+runs/
+*.pyc
