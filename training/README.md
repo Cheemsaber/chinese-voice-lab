@@ -135,6 +135,19 @@ or explicitly permit reuse:
 Use `-OverwriteOutput` only when replacing files in the named smoke directory
 is intentional.
 
+The wrapper defaults to `-Precision fp32`. This is deliberate for the current
+NVIDIA T550: a real selected batch produces a finite loss in FP32 but a NaN loss
+under FP16 autocast. Keep FP32 for the 4 GB laptop smoke test. On the RTX A6000,
+use `-Precision bf16` after confirming `torch.cuda.is_bf16_supported()` returns
+`True`:
+
+```powershell
+& .\training\run_smoke.ps1 -Precision bf16
+```
+
+`fp16` remains available as an explicit diagnostic option, but it is not the
+safe default for this dataset/model/hardware combination.
+
 ## Successful completion
 
 A successful run must show:
