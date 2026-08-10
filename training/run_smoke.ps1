@@ -1,7 +1,7 @@
 param(
-    [string]$DatasetRoot = "E:\speech-dataset",
+    [string]$DatasetRoot = "G:\speech-dataset",
     [string]$Model = "openai/whisper-base",
-    [string]$OutputDir = "E:\chinese-voice-lab\training_output\smoke-base",
+    [string]$OutputDir = "G:\chinese-voice-lab\training_output\smoke-base",
     [int]$TrainSamples = 4,
     [int]$ValidationSamples = 1,
     [int]$MaxSteps = 2,
@@ -31,7 +31,7 @@ if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($env:HF_HOME)) {
-    $env:HF_HOME = "E:\huggingface-cache"
+    $env:HF_HOME = "G:\huggingface-cache"
 }
 $env:HF_HUB_DOWNLOAD_TIMEOUT = "120"
 $env:HF_HUB_ETAG_TIMEOUT = "30"
