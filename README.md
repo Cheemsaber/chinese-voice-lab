@@ -252,3 +252,26 @@ The next benchmark should use realistic peer-checking phrases containing:
 
 It should compare `base` and `small` with `beam_size=1` on the same fixed WAV
 files and evaluate both raw transcription and normalized structured fields.
+
+## Full-dataset LoRA training
+
+The repository now includes a detailed, configuration-driven guide for moving
+from the bounded Whisper Base smoke test to full-dataset LoRA experiments:
+
+- [`FULL_DATA_LORA_TRAINING_GUIDE.md`](FULL_DATA_LORA_TRAINING_GUIDE.md)
+
+The guide keeps the existing smoke test intact and proposes a separate training
+path with:
+
+- one YAML configuration per experiment;
+- model switching through a single `model.id` value;
+- editable LoRA rank, alpha, dropout, target modules, and bias settings;
+- editable Hugging Face `Seq2SeqTrainingArguments`;
+- correct use of all 49 training, 8 validation, and 8 locked test records;
+- generated validation metrics and best-checkpoint selection;
+- offline model caching, checkpoint resume, TensorBoard, and reproducibility
+  metadata;
+- a Base-first experiment sequence before trying Whisper Small or Large-v3.
+
+Start with Whisper Base and the existing cached model. Advance to a larger model
+only when validation and locked-test evidence shows that Base is insufficient.
