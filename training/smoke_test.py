@@ -32,7 +32,7 @@ from transformers.utils import logging as transformers_logging
 
 DEVICE_ID_PATTERN = re.compile(r"^\d{3}[A-Z]{2}$")
 DEVICE_ID_SEARCH_PATTERN = re.compile(
-    r"(?<![A-Z0-9])\d{3}[A-Z]{2}(?![A-Z0-9])"
+    r"(?<!\d)\d{3}[A-Z]{2}"
 )
 REQUIRED_FIELDS = {
     "id",
@@ -56,18 +56,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-root",
         type=Path,
-        default=Path(r"E:\speech-dataset"),
+        default=Path(r"G:\speech-dataset"),
     )
     parser.add_argument(
         "--manifest",
         type=Path,
-        default=Path(r"E:\speech-dataset\manifests\metadata.jsonl"),
+        default=Path(r"G:\speech-dataset\manifests\metadata.jsonl"),
     )
     parser.add_argument("--model", default="openai/whisper-base")
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path(r"E:\chinese-voice-lab\training_output\smoke-base"),
+        default=Path(r"G:\chinese-voice-lab\training_output\smoke-base"),
     )
     parser.add_argument("--train-samples", type=int, default=4)
     parser.add_argument("--validation-samples", type=int, default=1)

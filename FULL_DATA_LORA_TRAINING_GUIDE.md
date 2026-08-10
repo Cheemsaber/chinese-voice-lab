@@ -145,7 +145,7 @@ early_stopping:
   threshold: 0.0
 
 evaluation:
-  identifier_pattern: '(?<![A-Z0-9])\d{3}[A-Z]{2}(?![A-Z0-9])'
+  identifier_pattern: '(?<!\d)\d{3}[A-Z]{2}'
   normalize_uppercase: true
   deduplicate_identifiers: true
   save_predictions: true
