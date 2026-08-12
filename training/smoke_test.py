@@ -32,7 +32,7 @@ from transformers.utils import logging as transformers_logging
 
 DEVICE_ID_PATTERN = re.compile(r"^\d{3}[A-Z]{2}$")
 DEVICE_ID_SEARCH_PATTERN = re.compile(
-    r"(?<![A-Z0-9])\d{3}[A-Z]{2}(?![A-Z0-9])"
+    r"(?<!\d)\d{3}[A-Z]{2}"
 )
 REQUIRED_FIELDS = {
     "id",
@@ -56,18 +56,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-root",
         type=Path,
-        default=Path(r"E:\speech-dataset"),
+        default=Path(r"G:\speech-dataset"),
     )
     parser.add_argument(
         "--manifest",
         type=Path,
-        default=Path(r"E:\speech-dataset\manifests\metadata.jsonl"),
+        default=Path(r"G:\speech-dataset\manifests\metadata.jsonl"),
     )
     parser.add_argument("--model", default="openai/whisper-base")
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path(r"E:\chinese-voice-lab\training_output\smoke-base"),
+        default=Path(r"G:\chinese-voice-lab\training_output\smoke-base"),
     )
     parser.add_argument("--train-samples", type=int, default=4)
     parser.add_argument("--validation-samples", type=int, default=1)
@@ -122,7 +122,12 @@ def resolve_dataset_path(dataset_root: Path, value: str, field: str, record_id: 
     return candidate
 
 
-def load_and_validate_manifest(manifest: Path, dataset_root: Path) -> list[dict[str, Any]]:
+def load_and_validate_manifest(
+    manifest: Path,
+    dataset_root: Path,
+    *,
+    allow_empty_device_ids: bool = False,
+) -> list[dict[str, Any]]:
     dataset_root = dataset_root.resolve()
     manifest = manifest.resolve()
     if not dataset_root.is_dir():
@@ -156,7 +161,9 @@ def load_and_validate_manifest(manifest: Path, dataset_root: Path) -> list[dict[
             raise ValueError(f"{record_id}: unsupported split {split!r}")
         if not isinstance(record["text"], str) or not record["text"].strip():
             raise ValueError(f"{record_id}: text must be nonempty")
-        if not isinstance(record["device_ids"], list) or not record["device_ids"]:
+        if not isinstance(record["device_ids"], list):
+            raise ValueError(f"{record_id}: device_ids must be a list")
+        if not record["device_ids"] and not allow_empty_device_ids:
             raise ValueError(f"{record_id}: device_ids must be a nonempty list")
 
         device_ids = [str(value) for value in record["device_ids"]]
