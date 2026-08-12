@@ -124,8 +124,7 @@ def print_run_plan(config: dict[str, Any], splits: dict[str, list[dict[str, Any]
     print(f"  Precision:              {config['model']['dtype'].upper()}")
     print(
         "  Records:                "
-        f"train={len(splits['train'])}, validation={len(splits['validation'])}, "
-        f"test={len(splits['test'])} (locked)"
+        f"train={len(splits['train'])}, validation={len(splits['validation'])}"
     )
     print(f"  Train micro-batch:      {training['per_device_train_batch_size']}")
     print(f"  Gradient accumulation:  {training['gradient_accumulation_steps']}")
