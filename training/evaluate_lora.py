@@ -64,7 +64,7 @@ def resolve_output_dir(
 def evaluate(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     validate_runtime(config, require_cuda=True)
-    _, splits = load_full_splits(config)
+    _, splits = load_full_splits(config, include_test=args.split == "test")
     records = splits[args.split]
     output_dir = resolve_output_dir(config, args.adapter, args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

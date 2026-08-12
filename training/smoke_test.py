@@ -122,7 +122,12 @@ def resolve_dataset_path(dataset_root: Path, value: str, field: str, record_id: 
     return candidate
 
 
-def load_and_validate_manifest(manifest: Path, dataset_root: Path) -> list[dict[str, Any]]:
+def load_and_validate_manifest(
+    manifest: Path,
+    dataset_root: Path,
+    *,
+    allow_empty_device_ids: bool = False,
+) -> list[dict[str, Any]]:
     dataset_root = dataset_root.resolve()
     manifest = manifest.resolve()
     if not dataset_root.is_dir():
@@ -156,7 +161,9 @@ def load_and_validate_manifest(manifest: Path, dataset_root: Path) -> list[dict[
             raise ValueError(f"{record_id}: unsupported split {split!r}")
         if not isinstance(record["text"], str) or not record["text"].strip():
             raise ValueError(f"{record_id}: text must be nonempty")
-        if not isinstance(record["device_ids"], list) or not record["device_ids"]:
+        if not isinstance(record["device_ids"], list):
+            raise ValueError(f"{record_id}: device_ids must be a list")
+        if not record["device_ids"] and not allow_empty_device_ids:
             raise ValueError(f"{record_id}: device_ids must be a nonempty list")
 
         device_ids = [str(value) for value in record["device_ids"]]

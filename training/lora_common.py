@@ -441,18 +441,25 @@ def prepare_run_directory(config: dict[str, Any]) -> Path:
 
 def load_full_splits(
     config: dict[str, Any],
+    *,
+    include_test: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
     data = config["data"]
     dataset_root = Path(str(data["dataset_root"]))
     manifest = Path(str(data["manifest"]))
-    records = load_and_validate_manifest(manifest, dataset_root)
+    records = load_and_validate_manifest(
+        manifest,
+        dataset_root,
+        allow_empty_device_ids=True,
+    )
     assert_split_isolation(records)
 
     split_mapping = {
         "train": str(data["train_split"]),
         "validation": str(data["validation_split"]),
-        "test": str(data["test_split"]),
     }
+    if include_test:
+        split_mapping["test"] = str(data["test_split"])
     splits = {
         purpose: sorted(
             (record for record in records if record["split"] == manifest_name),
@@ -464,7 +471,11 @@ def load_full_splits(
     if empty:
         raise ValueError(f"Required dataset splits are empty: {empty}")
     split_ids = [{record["id"] for record in values} for values in splits.values()]
-    if any(split_ids[i] & split_ids[j] for i in range(3) for j in range(i + 1, 3)):
+    if any(
+        split_ids[i] & split_ids[j]
+        for i in range(len(split_ids))
+        for j in range(i + 1, len(split_ids))
+    ):
         raise AssertionError("Record IDs overlap across dataset splits")
     return records, splits
 
@@ -479,7 +490,7 @@ def run_audio_preflight(
     splits: dict[str, list[dict[str, Any]]], sampling_rate: int
 ) -> None:
     print("Dataset preflight:")
-    for split_name in ("train", "validation", "test"):
+    for split_name in ("train", "validation"):
         dataset = build_audio_dataset(splits[split_name], sampling_rate)
         total_seconds = 0.0
         for record in dataset:
@@ -489,10 +500,9 @@ def run_audio_preflight(
                     f"{record['id']}: expected {sampling_rate} Hz, got {decoded_rate}"
                 )
             total_seconds += waveform.numel() / decoded_rate
-        role = "locked; never passed to Trainer" if split_name == "test" else "used"
         print(
             f"  {split_name}: {len(dataset)} records, "
-            f"{total_seconds / 60:.3f} minutes ({role})"
+            f"{total_seconds / 60:.3f} minutes (used)"
         )
 
 
