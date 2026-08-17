@@ -26,6 +26,7 @@ from lora_common import (
     ValidationMetricRecorder,
     apply_run_overrides,
     collect_run_metadata,
+    compute_transcription_metrics,
     effective_batch_size,
     load_config,
     load_full_splits,
@@ -36,7 +37,9 @@ from lora_common import (
     utc_now,
     validate_runtime,
     write_json,
+    write_jsonl,
     write_reproducibility_artifacts,
+    normalize_transcript,
 )
 
 
@@ -174,6 +177,59 @@ def build_training_arguments(
     )
 
 
+def save_training_predictions(
+    trainer: Seq2SeqTrainer,
+    train_dataset: Any,
+    processor: Any,
+    records: list[dict[str, Any]],
+    evaluation: dict[str, Any],
+    output_dir: Path,
+) -> dict[str, float]:
+    """Generate one final train-split report without affecting model selection."""
+    compute_metrics = trainer.compute_metrics
+    trainer.compute_metrics = None
+    try:
+        prediction_output = trainer.predict(
+            train_dataset,
+            metric_key_prefix="train_prediction",
+        )
+    finally:
+        trainer.compute_metrics = compute_metrics
+
+    predictions = prediction_output.predictions
+    if isinstance(predictions, tuple):
+        predictions = predictions[0]
+    if getattr(predictions, "ndim", 0) == 3:
+        predictions = predictions.argmax(axis=-1)
+    labels = prediction_output.label_ids.copy()
+    labels[labels == -100] = processor.tokenizer.pad_token_id
+    decoded_predictions = processor.batch_decode(
+        predictions,
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
+    )
+    decoded_predictions = [
+        normalize_transcript(text)
+        for text in decoded_predictions
+    ]   
+    decoded_references = processor.batch_decode(
+        labels,
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
+    )
+    metrics, rows = compute_transcription_metrics(
+        [record["id"] for record in records],
+        decoded_references,
+        decoded_predictions,
+        evaluation,
+    )
+    metrics.update(prediction_output.metrics)
+    if evaluation["save_predictions"]:
+        write_jsonl(output_dir / "training_predictions.jsonl", rows)
+    write_json(output_dir / "training_prediction_metrics.json", metrics)
+    return metrics
+
+
 def train(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     config = apply_run_overrides(
@@ -269,6 +325,15 @@ def train(args: argparse.Namespace) -> int:
         trainer.save_metrics("eval", final_evaluation)
         trainer.state.save_to_json(str(output_dir / "trainer_state.json"))
 
+        training_prediction_metrics = save_training_predictions(
+            trainer=trainer,
+            train_dataset=prepared["train"],
+            processor=processor,
+            records=splits["train"],
+            evaluation=config["evaluation"],
+            output_dir=output_dir,
+        )
+
         adapter_dir = output_dir / "best_adapter"
         trainer.model.save_pretrained(adapter_dir)
         processor.save_pretrained(adapter_dir)
@@ -293,6 +358,7 @@ def train(args: argparse.Namespace) -> int:
                 "learning_rate": config["training"]["learning_rate"],
                 "lora": config["lora"],
                 "train_metrics": train_result.metrics,
+                "training_prediction_metrics": training_prediction_metrics,
                 "final_evaluation": final_evaluation,
                 "best_checkpoint": trainer.state.best_model_checkpoint,
                 "best_metric": trainer.state.best_metric,

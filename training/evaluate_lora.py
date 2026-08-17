@@ -21,6 +21,7 @@ from lora_common import (
     validate_runtime,
     write_json,
     write_jsonl,
+    normalize_transcript,
 )
 
 
@@ -101,11 +102,12 @@ def evaluate(args: argparse.Namespace) -> int:
                 language=config["model"]["language_token"],
                 task=config["model"]["task"],
             )
-            prediction = processor.batch_decode(
+            raw_prediction = processor.batch_decode(
                 generated,
                 skip_special_tokens=True,
                 clean_up_tokenization_spaces=False,
             )[0]
+            prediction = normalize_transcript(raw_prediction)
             predictions.append(prediction)
             references.append(record["text"])
             record_ids.append(record["id"])

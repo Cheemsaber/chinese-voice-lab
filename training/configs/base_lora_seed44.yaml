@@ -1,0 +1,78 @@
+run:
+  name: 'base-lora-r8-lr1e4-seed44'
+  output_dir: 'G:\chinese-voice-lab\training_output\base-lora-r8-lr1e4-seed44'
+  overwrite_output: false
+  resume_from_checkpoint: null
+
+data:
+  dataset_root: 'G:\speech-dataset'
+  manifest: 'G:\speech-dataset\manifests\metadata.jsonl'
+  train_split: 'train'
+  validation_split: 'validation'
+  test_split: 'test'
+  audio_field: 'audio'
+  text_field: 'text'
+  sampling_rate: 16000
+
+model:
+  id: 'openai/whisper-base'
+  language: 'Chinese'
+  language_token: 'zh'
+  task: 'transcribe'
+  local_files_only: true
+  dtype: 'bf16'
+  use_safetensors: true
+  low_cpu_mem_usage: true
+  attn_implementation: 'sdpa'
+
+lora:
+  task_type: 'SEQ_2_SEQ_LM'
+  r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  target_modules:
+    - 'q_proj'
+    - 'v_proj'
+  bias: 'none'
+
+training:
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 2
+  learning_rate: 0.0001
+  lr_scheduler_type: 'linear'
+  warmup_ratio: 0.10
+  num_train_epochs: 10
+  bf16: true
+  fp16: false
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+  eval_strategy: 'epoch'
+  save_strategy: 'epoch'
+  logging_strategy: 'steps'
+  logging_steps: 1
+  save_total_limit: 3
+  predict_with_generate: true
+  generation_max_length: 128
+  load_best_model_at_end: true
+  metric_for_best_model: 'identifier_exact_accuracy'
+  greater_is_better: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  optim: 'adamw_torch'
+  report_to:
+    - 'tensorboard'
+  seed: 44
+  data_seed: 44
+
+early_stopping:
+  enabled: true
+  patience: 3
+  threshold: 0.0
+
+evaluation:
+  identifier_pattern: '(?<!\d)\d{3}[A-Z]{2}'
+  normalize_uppercase: true
+  deduplicate_identifiers: true
+  save_predictions: true

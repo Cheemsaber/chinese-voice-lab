@@ -17,6 +17,9 @@ from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+import unicodedata
+import opencc
+
 import jiwer
 import torch
 import yaml
@@ -155,6 +158,8 @@ REQUIRED_SECTION_KEYS = {
         "save_predictions",
     },
 }
+
+TRADITIONAL_TO_SIMPLIFIED = opencc.OpenCC("t2s.json")
 
 
 def utc_now() -> str:
@@ -716,6 +721,10 @@ class ValidationMetricRecorder:
             skip_special_tokens=True,
             clean_up_tokenization_spaces=False,
         )
+        decoded_predictions = [
+            normalize_transcript(text)
+            for text in decoded_predictions
+        ]
         decoded_references = self.processor.batch_decode(
             labels,
             skip_special_tokens=True,
@@ -863,3 +872,7 @@ def effective_batch_size(config: dict[str, Any], gpu_count: int = 1) -> int:
         * int(training["gradient_accumulation_steps"])
         * gpu_count
     )
+
+def normalize_transcript(text: str) -> str:
+    compatibility_normalized = unicodedata.normalize("NFKC", text)
+    return TRADITIONAL_TO_SIMPLIFIED.convert(compatibility_normalized)
