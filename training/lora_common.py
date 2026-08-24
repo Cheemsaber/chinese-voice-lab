@@ -448,7 +448,10 @@ def load_full_splits(
     config: dict[str, Any],
     *,
     include_test: bool = False,
+    require_test: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+    if require_test and not include_test:
+        raise ValueError("require_test=true requires include_test=true")
     data = config["data"]
     dataset_root = Path(str(data["dataset_root"]))
     manifest = Path(str(data["manifest"]))
@@ -472,7 +475,14 @@ def load_full_splits(
         )
         for purpose, manifest_name in split_mapping.items()
     }
-    empty = [name for name, values in splits.items() if not values]
+    required_splits = {"train", "validation"}
+    if require_test:
+        required_splits.add("test")
+    empty = [
+        name
+        for name, values in splits.items()
+        if name in required_splits and not values
+    ]
     if empty:
         raise ValueError(f"Required dataset splits are empty: {empty}")
     split_ids = [{record["id"] for record in values} for values in splits.values()]
@@ -495,7 +505,14 @@ def run_audio_preflight(
     splits: dict[str, list[dict[str, Any]]], sampling_rate: int
 ) -> None:
     print("Dataset preflight:")
-    for split_name in ("train", "validation"):
+    split_roles = {
+        "train": "optimization",
+        "validation": "model selection",
+        "test": "held-out final evaluation",
+    }
+    for split_name in ("train", "validation", "test"):
+        if not splits.get(split_name):
+            continue
         dataset = build_audio_dataset(splits[split_name], sampling_rate)
         total_seconds = 0.0
         for record in dataset:
@@ -507,7 +524,7 @@ def run_audio_preflight(
             total_seconds += waveform.numel() / decoded_rate
         print(
             f"  {split_name}: {len(dataset)} records, "
-            f"{total_seconds / 60:.3f} minutes (used)"
+            f"{total_seconds / 60:.3f} minutes ({split_roles[split_name]})"
         )
 
 
@@ -516,10 +533,13 @@ def prepare_trainer_dataset(
     processor: WhisperProcessor,
     sampling_rate: int,
 ) -> DatasetDict:
+    split_names = [
+        name for name in ("train", "validation", "test") if splits.get(name)
+    ]
     raw = DatasetDict(
         {
-            "train": build_audio_dataset(splits["train"], sampling_rate),
-            "validation": build_audio_dataset(splits["validation"], sampling_rate),
+            name: build_audio_dataset(splits[name], sampling_rate)
+            for name in split_names
         }
     )
 
@@ -532,7 +552,7 @@ def prepare_trainer_dataset(
         return {"input_features": features, "labels": labels}
 
     prepared = DatasetDict()
-    for split_name in ("train", "validation"):
+    for split_name in split_names:
         prepared[split_name] = raw[split_name].map(
             prepare_record,
             remove_columns=raw[split_name].column_names,

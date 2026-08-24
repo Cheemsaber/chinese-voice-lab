@@ -1,4 +1,4 @@
-"""Train a configuration-driven Whisper LoRA adapter on the full train split."""
+"""Train Whisper LoRA with validation selection and held-out test reporting."""
 
 from __future__ import annotations
 
@@ -115,10 +115,22 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Validate configuration, manifest, split isolation, and all audio without loading a model.",
     )
+    parser.add_argument(
+        "--evaluate-test",
+        action="store_true",
+        help=(
+            "Evaluate the held-out test split once after validation has selected and "
+            "restored the best checkpoint. Leave disabled while tuning experiments."
+        ),
+    )
     return parser.parse_args()
 
 
-def print_run_plan(config: dict[str, Any], splits: dict[str, list[dict[str, Any]]]) -> None:
+def print_run_plan(
+    config: dict[str, Any],
+    splits: dict[str, list[dict[str, Any]]],
+    evaluate_test: bool,
+) -> None:
     training = config["training"]
     print("Resolved training plan:")
     print(f"  Run:                    {config['run']['name']}")
@@ -127,13 +139,15 @@ def print_run_plan(config: dict[str, Any], splits: dict[str, list[dict[str, Any]
     print(f"  Precision:              {config['model']['dtype'].upper()}")
     print(
         "  Records:                "
-        f"train={len(splits['train'])}, validation={len(splits['validation'])}"
+        f"train={len(splits['train'])}, validation={len(splits['validation'])}, "
+        f"test={len(splits.get('test', []))}"
     )
     print(f"  Train micro-batch:      {training['per_device_train_batch_size']}")
     print(f"  Gradient accumulation:  {training['gradient_accumulation_steps']}")
     print(f"  Effective batch/GPU:    {effective_batch_size(config)}")
     print(f"  Learning rate:          {float(training['learning_rate']):.8g}")
     print(f"  Epochs:                 {training['num_train_epochs']}")
+    print(f"  Evaluate held-out test: {evaluate_test}")
     print(
         "  LoRA:                   "
         f"r={config['lora']['r']}, alpha={config['lora']['lora_alpha']}, "
@@ -177,21 +191,33 @@ def build_training_arguments(
     )
 
 
-def save_training_predictions(
+def save_split_predictions(
     trainer: Seq2SeqTrainer,
-    train_dataset: Any,
+    dataset: Any,
     processor: Any,
     records: list[dict[str, Any]],
     evaluation: dict[str, Any],
     output_dir: Path,
+    split_name: str,
 ) -> dict[str, float]:
-    """Generate one final train-split report without affecting model selection."""
+    """Generate a final split report without affecting model selection."""
+    if split_name == "train":
+        metric_key_prefix = "train_prediction"
+        predictions_filename = "training_predictions.jsonl"
+        metrics_filename = "training_prediction_metrics.json"
+    elif split_name == "test":
+        metric_key_prefix = "test"
+        predictions_filename = "test_predictions.jsonl"
+        metrics_filename = "test_metrics.json"
+    else:
+        raise ValueError(f"Unsupported prediction-report split: {split_name}")
+
     compute_metrics = trainer.compute_metrics
     trainer.compute_metrics = None
     try:
         prediction_output = trainer.predict(
-            train_dataset,
-            metric_key_prefix="train_prediction",
+            dataset,
+            metric_key_prefix=metric_key_prefix,
         )
     finally:
         trainer.compute_metrics = compute_metrics
@@ -225,9 +251,28 @@ def save_training_predictions(
     )
     metrics.update(prediction_output.metrics)
     if evaluation["save_predictions"]:
-        write_jsonl(output_dir / "training_predictions.jsonl", rows)
-    write_json(output_dir / "training_prediction_metrics.json", metrics)
+        write_jsonl(output_dir / predictions_filename, rows)
+    write_json(output_dir / metrics_filename, metrics)
     return metrics
+
+
+def save_training_predictions(
+    trainer: Seq2SeqTrainer,
+    train_dataset: Any,
+    processor: Any,
+    records: list[dict[str, Any]],
+    evaluation: dict[str, Any],
+    output_dir: Path,
+) -> dict[str, float]:
+    return save_split_predictions(
+        trainer=trainer,
+        dataset=train_dataset,
+        processor=processor,
+        records=records,
+        evaluation=evaluation,
+        output_dir=output_dir,
+        split_name="train",
+    )
 
 
 def train(args: argparse.Namespace) -> int:
@@ -238,8 +283,12 @@ def train(args: argparse.Namespace) -> int:
         overwrite_output=args.overwrite_output,
     )
     set_seed(int(config["training"]["seed"]))
-    _, splits = load_full_splits(config)
-    print_run_plan(config, splits)
+    _, splits = load_full_splits(
+        config,
+        include_test=True,
+        require_test=args.evaluate_test,
+    )
+    print_run_plan(config, splits, args.evaluate_test)
     run_audio_preflight(splits, int(config["data"]["sampling_rate"]))
     if args.validate_only:
         print("Full-data configuration and audio preflight: PASS")
@@ -267,8 +316,13 @@ def train(args: argparse.Namespace) -> int:
             ),
             module=r"peft\.utils\.save_and_load",
         )
+        preparation_splits = {
+            name: values
+            for name, values in splits.items()
+            if name != "test" or args.evaluate_test
+        }
         prepared = prepare_trainer_dataset(
-            splits,
+            preparation_splits,
             processor,
             int(config["data"]["sampling_rate"]),
         )
@@ -338,11 +392,26 @@ def train(args: argparse.Namespace) -> int:
         trainer.model.save_pretrained(adapter_dir)
         processor.save_pretrained(adapter_dir)
 
+        test_evaluation = None
+        if args.evaluate_test:
+            print("Evaluating held-out test split with the saved best adapter...")
+            test_evaluation = save_split_predictions(
+                trainer=trainer,
+                dataset=prepared["test"],
+                processor=processor,
+                records=splits["test"],
+                evaluation=config["evaluation"],
+                output_dir=output_dir,
+                split_name="test",
+            )
+
         metadata["status"] = "PASS"
         metadata["finished_at"] = utc_now()
         metadata["best_checkpoint"] = trainer.state.best_model_checkpoint
         metadata["best_metric"] = trainer.state.best_metric
         metadata["adapter_dir"] = str(adapter_dir)
+        metadata["test_evaluation_requested"] = args.evaluate_test
+        metadata["test_evaluation"] = test_evaluation
         if torch.cuda.is_available():
             metadata["peak_cuda_memory"] = {
                 "allocated_bytes": torch.cuda.max_memory_allocated(),
@@ -360,6 +429,8 @@ def train(args: argparse.Namespace) -> int:
                 "train_metrics": train_result.metrics,
                 "training_prediction_metrics": training_prediction_metrics,
                 "final_evaluation": final_evaluation,
+                "test_evaluation_requested": args.evaluate_test,
+                "test_evaluation": test_evaluation,
                 "best_checkpoint": trainer.state.best_model_checkpoint,
                 "best_metric": trainer.state.best_metric,
                 "adapter_dir": str(adapter_dir),

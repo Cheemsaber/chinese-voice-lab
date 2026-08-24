@@ -5,7 +5,8 @@ param(
     [switch]$AllowDownload,
     [string]$ResumeFromCheckpoint,
     [switch]$OverwriteOutput,
-    [switch]$ValidateOnly
+    [switch]$ValidateOnly,
+    [switch]$EvaluateTest
 )
 
 $ErrorActionPreference = "Stop"
@@ -51,6 +52,9 @@ if ($OverwriteOutput) {
 if ($ValidateOnly) {
     $trainingArguments += "--validate-only"
 }
+if ($EvaluateTest) {
+    $trainingArguments += "--evaluate-test"
+}
 
 Write-Host "Python:      $python"
 Write-Host "Config:      $configPath"
@@ -58,6 +62,7 @@ Write-Host "HF_HOME:     $env:HF_HOME"
 Write-Host "Offline:     $env:HF_HUB_OFFLINE"
 Write-Host "Resume:      $ResumeFromCheckpoint"
 Write-Host "Validate:    $ValidateOnly"
+Write-Host "Test:        $EvaluateTest"
 
 & $python @trainingArguments
 if ($LASTEXITCODE -ne 0) {
