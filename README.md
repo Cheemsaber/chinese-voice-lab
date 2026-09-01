@@ -1,277 +1,381 @@
 # Chinese Voice Lab
 
-## Experiment review and achievements
+Chinese Voice Lab is an experimental speech-recognition project for Chinese
+operational utterances containing structured equipment identifiers such as
+`019KG`. It covers the path from Windows microphone capture and controlled
+Faster-Whisper benchmarks to reproducible Hugging Face Whisper LoRA training,
+generation-based evaluation, and adapter export.
 
-The experiments have separated the original speech-recognition symptoms into
-three areas: microphone capture, Whisper decoding, and runtime performance.
-The most important finding is that the original first-phoneme problem was
-primarily associated with the input path, rather than simply being caused by
-Faster-Whisper.
+> **Project status:** This repository is public for technical review and
+> reproducibility, but it is **not currently accepting external contributions**.
+> Please do not submit pull requests, dataset additions, or feature requests at
+> this stage.
 
-## Experiment summary
+> **Private data:** The training dataset is not included in this repository and
+> is not available for public access. Consent to publish the participants' voice
+> recordings has not been granted, so the training audio, manifests,
+> participant metadata, and utterance-level outputs must remain private.
 
-| Experiment | Main achievement | Conclusion |
-| --- | --- | --- |
-| Host API and onset capture | Identified a usable microphone route | Explicit Realtek MME device 1 is the reliable tested path |
-| MME level threshold | Measured sensitivity to speaking volume | Loud speech is preserved reliably; quiet speech is unreliable |
-| Leading-silence Whisper | Separated captured audio from VAD and padding | Additional digital silence does not consistently improve recognition |
-| Model size and beam search | Quantified accuracy and latency trade-offs | Beam 1 is sufficient; `base` is fast and `small` is most accurate |
+This is a research prototype, not a production- or safety-certified speech
+system.
 
-## 1. Host API and sustained-vowel capture
+## Project goals
 
-Experiment: [`experiments/capture_onset.py`](experiments/capture_onset.py)
+The project investigates four connected questions:
 
-This experiment compared the same Realtek microphone through different
-Windows audio interfaces.
+1. How can the first phoneme be captured reliably through Windows audio APIs?
+2. How well do pretrained Whisper models recognize Chinese speech mixed with
+   letter-and-number equipment identifiers?
+3. Can parameter-efficient LoRA adaptation improve identifier and transcript
+   accuracy on a small domain dataset?
+4. How can training and evaluation remain reproducible while keeping private
+   voice data outside the public repository?
 
-Observed results:
+## Achievements
 
-- MME device 1 captured meaningful speech.
-- DirectSound device 5 produced an all-zero WAV.
-- WASAPI shared and exclusive did not preserve the sustained vowel correctly
-  in listening tests.
-- None of the recordings overflowed.
-- Opening the stream before the cue and retaining pre-roll prevented PortAudio
-  startup from simply discarding the beginning.
+- Isolated the original weak-onset problem primarily to the microphone input
+  path rather than Faster-Whisper decoding. Realtek MME device 1, native
+  44.1 kHz capture, early stream opening, and retained pre-roll produced the
+  most reliable tested input.
+- Demonstrated that arbitrary leading silence is not a reliable recognition
+  fix and that beam size 5 added latency without improving the controlled
+  sample. Beam size 1 was sufficient in that benchmark.
+- Built a repeatable mixed-identifier benchmark. The recorded Whisper Small
+  run recognized 14 of 16 equipment-identifier cases exactly and exposed the
+  remaining domain errors that motivated fine-tuning.
+- Built a bounded Whisper Base LoRA smoke test covering manifest validation,
+  audio decoding, feature extraction, LoRA injection, two optimizer steps,
+  validation, generation, and adapter saving. The recorded smoke run passed
+  and recovered the expected `019KG` identifier.
+- Built a configuration-driven full training pipeline with speaker/session
+  split isolation, complete audio preflight, offline model loading, checkpoint
+  resume, BF16 training, gradient checkpointing, early stopping, reproducibility
+  metadata, prediction export, and optional held-out test evaluation.
+- Completed LoRA experiments for Whisper Base, Small, and Large-v3, targeting
+  `q_proj` and `v_proj` with ranks 8, 16, and 32 where applicable.
+- Reduced Whisper Small validation CER from `0.3333` to `0.0622` with the best
+  rank-32 adapter, an 81.34% relative reduction.
+- Reduced Whisper Large-v3 CER by 7.76% relative on validation and 7.34%
+  relative on the held-out test while preserving its already strong identifier
+  accuracy.
 
-This showed that different device indices did not provide equivalent access
-to the same physical microphone.
-
-The resulting capture configuration was:
-
-```text
-Device:      1
-Host API:    MME
-Sample rate: 44100 Hz
-Channels:    1
-```
-
-The experiment defines three WDM-KS trials, but no corresponding output WAVs
-currently exist. Therefore, MME was the best option among the completed MME,
-DirectSound, and WASAPI trials, rather than necessarily every possible Windows
-endpoint.
-
-## 2. MME speech-level experiment
-
-Experiment:
-[`experiments/mme_level_threshold.py`](experiments/mme_level_threshold.py)
-
-Saved report:
-[`experiment_output/mme_level_threshold/mme_level_test_result.txt`](experiment_output/mme_level_threshold/mme_level_test_result.txt)
-
-This experiment tested nine sustained-vowel recordings: three quiet, three
-normal, and three loud.
-
-| Level | Reliable continuous runs |
-| --- | ---: |
-| Quiet | 0/3 |
-| Normal | 1/3 clearly reliable; one nearly reliable |
-| Loud | 3/3 |
-
-For loud speech:
-
-- Continuity was 100% in all three trials.
-- The signal remained active until the recording boundary.
-- Peaks were approximately -13 to -15 dBFS.
-- There was no clipping or input overflow.
-- Gain changes were small.
-
-This establishes that MME can preserve sustained speech correctly when the
-signal is strong enough. It also shows that the earlier shortened vowel was
-not something Faster-Whisper did: the problem was already present or absent
-inside the WAV before transcription.
-
-The quiet results suggest some combination of:
-
-- low signal-to-noise ratio;
-- Realtek noise suppression;
-- automatic microphone processing;
-- the experiment's energy threshold;
-- difficulty sustaining an unusually quiet vowel consistently.
-
-The observed initial volume ramp also exists in the captured waveform, so
-Faster-Whisper cannot be its cause. Microphone or driver processing is the more
-plausible source.
-
-These results do not mean operators must speak loudly. Normal operational
-phrases contain changing phonemes and may survive microphone processing better
-than a perfectly sustained vowel. A realistic speech corpus will provide more
-representative evidence.
-
-## 3. Leading-silence and VAD experiment
-
-Experiment:
-[`experiments/leading_silence_whisper.py`](experiments/leading_silence_whisper.py)
-
-The experiment used the following controlled procedure:
-
-1. Record the phrase once.
-2. Locate and preserve the first phoneme.
-3. Create identical copies with 0, 250, 500, and 1000 ms of digital silence.
-4. Disable Faster-Whisper VAD explicitly.
-5. Transcribe every copy with the same model settings.
-
-No padding duration produced consistently better output. For example, 1000 ms
-was exact in one run but produced errors in another.
-
-Therefore, adding leading silence is not a reliable decoder-level solution.
-
-Listening tests found that the first phoneme in the MME recording was already
-clearer. This indicates that explicitly selecting the working MME route and
-retaining pre-roll improved capture. Whisper then received a complete phoneme.
-
-The experiment also eliminated one incorrect interpretation:
-`vad_filter=False` did not repair the microphone. It ensured only that
-Faster-Whisper's Silero VAD was not an additional variable.
-
-The result table is not currently saved to a CSV or text file, so only the WAV
-variants remain. Future experiments should persist every result automatically.
-
-## 4. Model size and beam-search benchmark
-
-Experiment:
-[`experiments/model_size_beam_search.py`](experiments/model_size_beam_search.py)
-
-Latest results:
-[`experiment_output/model_size_beam_search/results.csv`](experiment_output/model_size_beam_search/results.csv)
-
-This experiment used the same 5.33-second WAV for every configuration, warmed
-each model, and measured three inference runs.
-
-### Stable cached results
-
-| Model | Beam 1 inference | Result |
-| --- | ---: | --- |
-| `tiny` | 0.27 s | Traditional output plus a recognition error |
-| `base` | 0.47 s | One-character error |
-| `small` | 1.34 s | Exact transcription |
-
-Beam 5:
-
-- produced identical text for every model;
-- added approximately 7-11% latency;
-- demonstrated no benefit on this recording.
-
-The supported beam-search choice is:
+## Repository layout
 
 ```text
-beam_size=1
+.
+|-- main.py                              # Early microphone/inference prototype
+|-- experiments/                         # Controlled capture and ASR benchmarks
+|-- experiment_output/                   # Small public experiment artifacts
+|-- training/
+|   |-- smoke_test.py                    # Bounded engineering smoke test
+|   |-- run_smoke.ps1                    # Smoke-test launcher
+|   |-- train_lora.py                    # Full Seq2SeqTrainer entry point
+|   |-- lora_common.py                   # Data, model, metric, and artifact helpers
+|   |-- run_train.ps1                    # Full-training launcher
+|   |-- evaluate_lora.py                 # Frozen-baseline or adapter evaluation
+|   `-- configs/                          # One YAML file per experiment
+|-- requirements.txt                     # Reproducible Python dependency set
+|-- FULL_DATA_LORA_TRAINING_GUIDE.md      # Detailed training guide
+|-- WHISPER_FINETUNING_WORKFLOW.md        # Dataset-to-deployment workflow
+`-- WHISPER_TRAINING_ENVIRONMENT_SETUP.md # Windows/CUDA environment setup
 ```
 
-The 1253-second initial `small` load was confirmed to be a first-time download.
-Its cached load later fell to 1.12 seconds.
+Generated checkpoints, adapters, predictions, and run metadata are written to
+`training_output/`, which is intentionally ignored by Git.
 
-All three models ran faster than real time:
+## Dataset and privacy boundary
+
+The current private manifest contains 142 recordings:
+
+| Split | Recordings | Speakers | Sessions | Purpose |
+| --- | ---: | ---: | ---: | --- |
+| Train | 106 | 14 | 14 | Optimization |
+| Validation | 16 | 2 | 3 | Model and checkpoint selection |
+| Test | 20 | 2 | 3 | Held-out final evaluation |
+
+Speaker and session identities are isolated across splits. The training
+pipeline rejects duplicate IDs, missing files, malformed records, path escapes,
+and cross-split speaker/session leakage before loading a model.
+
+Audio under the private `processed_16khz` directory is normalized to mono,
+16 kHz, 16-bit PCM WAV. This gives the training pipeline one stable input
+format, avoids repeated resampling differences, and matches Whisper's expected
+sampling rate before log-Mel feature extraction.
+
+The private dataset must not be committed, mirrored, attached to releases, or
+shared through issue reports. Generated prediction files can reproduce private
+transcripts and should be handled with the same care.
+
+The small WAV files already present under `experiment_output/` and the
+repository root are separate from the training corpus. They should remain
+public only if the repository owner has confirmed publication rights for every
+recorded voice.
+
+## Training pipeline
 
 ```text
-tiny RTF:  0.05
-base RTF:  0.09
-small RTF: 0.25
+private JSONL manifest
+        |
+        v
+schema, path, speaker, and session validation
+        |
+        v
+decode every WAV and verify 16 kHz audio
+        |
+        v
+WhisperProcessor
+  |-- feature extractor: waveform -> log-Mel input_features
+  `-- tokenizer: transcript -> label token IDs
+        |
+        v
+pretrained Whisper encoder-decoder
+        +
+PEFT LoRA adapters on q_proj and v_proj
+        |
+        v
+Seq2SeqTrainer
+  |-- teacher-forced forward pass and cross-entropy loss
+  |-- PyTorch autograd backward pass
+  |-- AdamW updates only trainable LoRA parameters
+  `-- generation-based validation and checkpointing
+        |
+        v
+best_adapter + processor + aggregate metrics
+        |
+        v
+one final evaluation on the locked test split
 ```
 
-This proves the computer has enough inference performance for short
-post-utterance recognition.
+For each selected attention projection, LoRA uses
 
-The current model conclusions are:
+```text
+y = W x + (alpha / rank) B A x
+```
 
-- `base`: best responsiveness and accuracy balance;
-- `small`: best observed accuracy and likely preferable for safety-relevant
-  field comparison;
-- `tiny`: not sufficiently reliable yet;
-- beam 5: unnecessary based on current evidence.
+The pretrained Whisper weight `W` remains frozen while the low-rank `A` and
+`B` matrices are trained. Current experiments keep `alpha / rank = 2`, use
+5% LoRA dropout, and target query and value projections.
 
-This benchmark contains only one speaker and one WAV. Tiny's reported 50% CER
-is also exaggerated by Traditional-versus-Simplified character differences.
+## Current results
 
-## Status of the original problems
+The tables below summarize locally recorded aggregate metrics. Lower CER is
+better; higher identifier exact accuracy is better. Because the validation
+split contains only 16 recordings, these values are experimental rather than
+production estimates.
 
-### First characters poorly recognized
+### Validation
 
-**Mostly narrowed down, with a practical capture configuration identified.**
+| Model | Configuration | Identifier exact accuracy | CER |
+| --- | --- | ---: | ---: |
+| Whisper Base baseline | Frozen pretrained model | 0.3125 | 0.8483 |
+| Whisper Base LoRA | r8, alpha 16, LR 1e-4, seed 42/44 tie | 0.7500 | 0.2960 |
+| Whisper Small baseline | Frozen pretrained model | 0.6875 | 0.3333 |
+| Whisper Small LoRA | r32, alpha 64, LR 5e-5, seed 42 | **0.8750** | **0.0622** |
+| Whisper Large-v3 baseline | Frozen pretrained model | **0.9375** | 0.2886 |
+| Whisper Large-v3 LoRA | r32, alpha 64, LR 5e-5, seed 42 | **0.9375** | **0.2662** |
 
-Achievements:
+### Held-out test
 
-- Explicit MME device 1 works.
-- Native 44.1 kHz avoids an unnecessary capture-side conversion.
-- Opening the stream early and retaining pre-roll protects the first phoneme.
-- Digital silence padding is not a stable recognition fix.
-- Faster-Whisper VAD was ruled out as the primary cause in this experiment.
+| Model | Configuration | Identifier exact accuracy | CER |
+| --- | --- | ---: | ---: |
+| Whisper Small LoRA | r32, alpha 64, LR 5e-5, seed 42 | 0.9500 | 0.0842 |
+| Whisper Large-v3 baseline | Frozen pretrained model | 1.0000 | 0.2238 |
+| Whisper Large-v3 LoRA | r32, alpha 64, LR 5e-5, seed 42 | 1.0000 | **0.2074** |
 
-Quiet speech and microphone processing can still weaken the signal.
+A saved Whisper Small baseline test artifact is not currently part of the
+experiment record, so it is intentionally omitted from the held-out table.
+WER is also recorded, but CER is the more useful general transcription metric
+for these predominantly Chinese utterances because whitespace-based word
+segmentation is not stable.
 
-### Chinese numbers mixed with English letters
+## Quick start
 
-**Not tested yet.**
+The project is designed for Windows PowerShell, Python 3.11, an NVIDIA CUDA
+environment, and locally cached Hugging Face models. Follow the complete
+[environment setup guide](WHISPER_TRAINING_ENVIRONMENT_SETUP.md) before running
+GPU training.
 
-This remains the clearest next experiment, now tailored to real equipment
-identifiers, values, states, and actions.
+```powershell
+py -3.11 -m venv .venv-whisper-ft
+& .\.venv-whisper-ft\Scripts\Activate.ps1
+python -m pip install -r .\requirements.txt
+python -m pip check
+```
 
-### High latency and repeated model loading
+The committed YAML configurations contain machine-specific absolute paths for
+the dataset, cache, and outputs. Review and change those paths before using the
+project on another computer. Do not replace them with a path to public storage
+containing the private corpus.
 
-**Diagnosed, but not yet fixed in the application.**
+### Validate data without loading a model
 
-The benchmark proves inference itself is fast enough. The repeated delay comes
-largely from application structure.
+```powershell
+& .\training\run_smoke.ps1 `
+    -DatasetRoot "D:\private-speech-dataset" `
+    -PreflightOnly
+```
 
-The current [`main.py`](main.py) still:
+### Run the bounded smoke test
 
-- uses the unspecified default input device;
-- requests 16 kHz directly instead of the verified native MME configuration;
-- loads `WhisperModel` inside `recognize_audio()` every time;
-- waits for a fixed five-second recording;
-- plays the recording before recognition.
+```powershell
+& .\training\run_smoke.ps1 `
+    -DatasetRoot "D:\private-speech-dataset" `
+    -Precision fp32
+```
 
-The experimental findings have therefore not yet been integrated into the
-main program.
+The smoke test defaults to 4 training records, 1 validation record, and 2
+optimizer steps. It never uses the test split.
 
-## Overall achievement
+### Validate a full-training configuration
 
-The project has moved from a general observation that the beginning sounds
-vague and Whisper is slow to the following evidence-based understanding:
+```powershell
+& .\training\run_train.ps1 `
+    -Config .\training\configs\small_lora_r32_lr5e5_seed42.yaml `
+    -ValidateOnly
+```
 
-1. Windows microphone routes behave differently.
-2. MME device 1 is the verified capture route.
-3. Capture quality depends strongly on input level.
-4. The first phoneme can be preserved before Whisper receives it.
-5. Arbitrary leading silence does not stabilize transcription.
-6. Beam 5 is slower without a demonstrated accuracy benefit.
-7. `base` and `small` are both comfortably faster than real time.
-8. Repeated model loading is an application-design issue.
-9. The next unresolved technical risk is recognizing operational identifiers
-   containing Chinese numbers and English letters.
+### Train an adapter
 
-## Next experiment
+```powershell
+& .\training\run_train.ps1 `
+    -Config .\training\configs\small_lora_r32_lr5e5_seed42.yaml
+```
 
-The next benchmark should use realistic peer-checking phrases containing:
+Use `-ResumeFromCheckpoint` to resume a compatible interrupted run. Use
+`-EvaluateTest` only for a final selected configuration; the test split should
+not participate in routine tuning.
 
-- equipment identifiers such as `A2` and `B307`;
-- Chinese numbers mixed with English letters;
-- actions such as connect, disconnect, open, and close;
-- states such as `ON` and `OFF`;
-- measured values and units.
+### Evaluate a frozen baseline or saved adapter
 
-It should compare `base` and `small` with `beam_size=1` on the same fixed WAV
-files and evaluate both raw transcription and normalized structured fields.
+```powershell
+# Frozen baseline: omit --adapter
+& .\.venv-whisper-ft\Scripts\python.exe `
+    .\training\evaluate_lora.py `
+    --config .\training\configs\whisper_small_baseline.yaml `
+    --split validation
 
-## Full-dataset LoRA training
+# Adapter evaluation
+& .\.venv-whisper-ft\Scripts\python.exe `
+    .\training\evaluate_lora.py `
+    --config .\training\configs\small_lora_r32_lr5e5_seed42.yaml `
+    --adapter .\training_output\small-lora-r32-lr5e5-seed42\best_adapter `
+    --split test
+```
 
-The repository now includes a detailed, configuration-driven guide for moving
-from the bounded Whisper Base smoke test to full-dataset LoRA experiments:
+The launchers use offline Hugging Face mode by default. Supply the documented
+download option only when intentionally populating a local model cache.
 
-- [`FULL_DATA_LORA_TRAINING_GUIDE.md`](FULL_DATA_LORA_TRAINING_GUIDE.md)
+## Metrics
 
-The guide keeps the existing smoke test intact and proposes a separate training
-path with:
+- **Identifier exact accuracy:** proportion of utterances whose complete set
+  of identifiers matches the reference.
+- **Identifier character accuracy:** character-level accuracy inside normalized
+  identifiers.
+- **Identifier precision/recall:** false-positive and missed-identifier
+  behavior.
+- **CER:** character edit distance divided by the number of reference
+  characters.
+- **WER:** whitespace-token word error rate; retained for comparability but
+  interpreted cautiously for Chinese.
 
-- one YAML configuration per experiment;
-- model switching through a single `model.id` value;
-- editable LoRA rank, alpha, dropout, target modules, and bias settings;
-- editable Hugging Face `Seq2SeqTrainingArguments`;
-- correct use of all 49 training, 8 validation, and 8 locked test records;
-- generated validation metrics and best-checkpoint selection;
-- offline model caching, checkpoint resume, TensorBoard, and reproducibility
-  metadata;
-- a Base-first experiment sequence before trying Whisper Small or Large-v3.
+Predictions are normalized for Unicode, whitespace, case, and configured
+Traditional-to-Simplified Chinese conversion before aggregate evaluation.
 
-Start with Whisper Base and the existing cached model. Advance to a larger model
-only when validation and locked-test evidence shows that Base is insufficient.
+## Current limitations and known issues
+
+### 1. Checkpoint selection uses an overly coarse metric
+
+The current Trainer selects and early-stops on identifier exact accuracy only.
+With 16 validation recordings, one utterance changes that metric by 6.25
+percentage points, and tied scores retain the earliest checkpoint.
+
+This affected the Large-v3 rank-32 run:
+
+```text
+Epoch 1: identifier accuracy 0.9375, CER 0.2662  <- selected
+Epoch 4: identifier accuracy 0.9375, CER 0.0572  <- not selected
+```
+
+Validation loss and CER were still improving, so this is not evidence of
+classic overfitting. It is a localized checkpoint-selection issue and should
+be straightforward to fix by selecting lexicographically: highest identifier
+accuracy first, then lowest CER among ties. Early stopping must monitor the
+same rule.
+
+### 2. The dataset is too small for higher-capacity experiments
+
+The 106/16/20 split is useful for a controlled pilot but too small for strong
+claims across speakers, microphones, accents, noise conditions, and operating
+phrases. Rank 32 is therefore the current LoRA ceiling. Do **not** continue to
+rank 64 or higher on this corpus: additional adapter capacity would add
+parameters without enough independent data and would increase the risk of
+memorization and unstable model selection.
+
+The next scaling step should be more consented, speaker-diverse data and more
+repeated seeds, not a higher LoRA rank.
+
+### 3. Limited repeated-seed evidence
+
+Several rank-8 runs use seeds 42-44, but the winning rank-32 Small and Large-v3
+configurations currently have only seed 42. Repeat the final configurations
+across multiple seeds and report mean and variation before treating rank 32 as
+a stable improvement.
+
+### 4. Validation-selection and test-reuse risk
+
+Multiple configurations were compared on the same 16-record validation split.
+That can overfit experiment choices to a small validation set even when the
+training curve itself looks healthy. Small and Large-v3 have also now been
+examined on the 20-record test split. Further tuning should not use those test
+results as feedback; reserve a new consented audit set for the next final
+comparison if development continues.
+
+### 5. Domain coverage remains narrow
+
+Current metrics emphasize identifiers matching `DDDCC`-style patterns and a
+limited set of operational phrases. They do not yet establish robustness to
+unseen equipment formats, spontaneous speech, overlapping speakers, heavy
+noise, far-field microphones, or safety-critical semantic distinctions such
+as negation, action, state, and numerical value.
+
+### 6. Environment portability is limited
+
+The training path currently assumes Windows, local absolute paths, CUDA/BF16,
+a local Hugging Face cache, and a compatible Torch/TorchCodec/FFmpeg stack.
+TorchCodec requires the appropriate shared FFmpeg libraries. The bounded smoke
+test uses FP32 by default on the 4 GB NVIDIA T550 because FP16 produced a
+non-finite loss in the recorded environment; full runs were designed around a
+larger BF16-capable GPU.
+
+### 7. Training and live inference are not integrated
+
+`main.py` remains an early microphone prototype. It does not yet load the
+selected PEFT adapter or implement a production streaming, confidence,
+fallback, or human-verification workflow.
+
+### 8. Public-release hygiene still needs review
+
+The private training corpus is correctly external to the repository, but all
+tracked experimental WAV files should be audited to confirm that each voice is
+owned by the repository author or explicitly cleared for publication. The
+repository also does not currently include a `LICENSE` file, so public
+visibility should not be interpreted as a completed open-source release.
+
+## Documentation
+
+- [Full-dataset LoRA training guide](FULL_DATA_LORA_TRAINING_GUIDE.md)
+- [Whisper fine-tuning workflow](WHISPER_FINETUNING_WORKFLOW.md)
+- [Training environment setup](WHISPER_TRAINING_ENVIRONMENT_SETUP.md)
+- [Smoke-test documentation](training/README.md)
+- [Mixed-identifier benchmark](experiments/mixed_identifier_benchmark.py)
+- [Recorded mixed-identifier results](experiment_output/mixed_identifier_benchmark/results_20260730_004523.csv)
+
+## Contribution policy
+
+External contributions are not being accepted at this time. Pull requests,
+third-party voice datasets, and unsolicited code changes may be closed without
+review. This policy protects the current experimental scope and prevents
+private or insufficiently consented voice data from entering the project.
+
+The policy may be reconsidered after the checkpoint-selection fix, dataset
+governance review, publication-rights audit, and a formal license decision.
