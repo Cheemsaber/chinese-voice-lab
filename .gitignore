@@ -9,3 +9,6 @@ __pycache__/
 training_output/
 runs/
 *.pyc
+
+# Private voice recordings
+experiment_output/mixed_identifier_benchmark/audio/
